@@ -80,6 +80,7 @@ class My_App(QtWidgets.QMainWindow):
 		sift = cv2.SIFT_create()
 
 		# find the template keypoints and descriptors with SIFT
+		# key_points are a list of keypoint objects which have attributes about each point like its coordinates, size, etc 
 		key_points_template, desc_vector_template = sift.detectAndCompute(template, None); # None = no mask
 
 		# find video keypoints and descriptors with SIFT 
@@ -111,20 +112,26 @@ class My_App(QtWidgets.QMainWindow):
 			if m.distance < 0.6 * n.distance:
 				good_points.append(m) # m is a vector descriptor
 
-		
-		# Apply Homography 
-		query_pts = np.float32([key_points_template[m.queryIdx].pt for m in good_points]).reshape(-1, 1, 2)
-		train_pts = np.float32([key_points_video[m.trainIdx].pt for m in good_points]).reshape(-1, 1, 2)
-		matrix, mask = cv2.findHomography(query_pts, train_pts, cv2.RANSAC, 5.0)
-		matches_mask = mask.ravel().tolist()
+		if len(good_points) > 10:
+			# Take matches and find the homography matrix needed to transform the template image to the video frame
+			# Under the hood, findHomography uses RANSAC to find the homography matrix
+			# Find kpts in both template and video frame. Reshape them to be in a matrix dimension that findHomography can use.
+			good_template_pts = np.float32([key_points_template[m.queryIdx].pt for m in good_points]).reshape(-1, 1, 2)
+			good_video_pts = np.float32([key_points_video[m.trainIdx].pt for m in good_points]).reshape(-1, 1, 2)
+			matrix, mask = cv2.findHomography(good_template_pts, good_video_pts, cv2.RANSAC, 5.0)
+			matches_mask = mask.ravel().tolist()
 
-		# Perspective transform
-		h, w = template.shape[:2]
-		pts = np.float32([[0, 0], [0, h], [w, h], [w, 0]]).reshape(-1, 1, 2)
-		dst = cv2.perspectiveTransform(pts, matrix)
-		homography = cv2.polylines(frame, [np.int32(dst)], True, (255, 0, 0), 3)
+			# Apply the transform to map the points of the template image to the video frame
+			h, w = template.shape[:2]
+			pts = np.float32([[0, 0], [0, h], [w, h], [w, 0]]).reshape(-1, 1, 2)
+			dst = cv2.perspectiveTransform(pts, matrix)
 
-		return homography
+			# Draw the transformed template image on the video frame
+			homography = cv2.polylines(frame, [np.int32(dst)], True, (255, 0, 0), 3)
+
+			return homography
+		else:
+			return frame
 
 if __name__ == "__main__":
 	app = QtWidgets.QApplication(sys.argv)
