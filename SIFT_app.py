@@ -114,13 +114,14 @@ class My_App(QtWidgets.QMainWindow):
 
 		if len(good_points) > 10:
 			# Take matches and find the homography matrix needed to transform the template image to the video frame
-			# Under the hood, findHomography uses RANSAC to find the homography matrix
 			# Find kpts in both template and video frame. Reshape them to be in a matrix dimension that findHomography can use.
 			good_template_pts = np.float32([key_points_template[m.queryIdx].pt for m in good_points]).reshape(-1, 1, 2)
 			good_video_pts = np.float32([key_points_video[m.trainIdx].pt for m in good_points]).reshape(-1, 1, 2)
+			
+			# Under the hood, findHomography uses RANSAC to find the homography matrix
+			# Gives us the transformation matrix to map the point in the template image to the video frame
 			matrix, mask = cv2.findHomography(good_template_pts, good_video_pts, cv2.RANSAC, 5.0)
-			matches_mask = mask.ravel().tolist()
-
+			
 			# Apply the transform to map the points of the template image to the video frame
 			h, w = template.shape[:2]
 			pts = np.float32([[0, 0], [0, h], [w, h], [w, 0]]).reshape(-1, 1, 2)
